@@ -26,7 +26,7 @@ import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver}
 import org.apache.spark.shuffle.rdma.writer.wrapper.RdmaWrapperShuffleData
 import org.apache.spark.storage.ShuffleBlockId
 
-class RdmaShuffleBlockResolver(rdmaShuffleManager: RdmaShuffleManager)
+class RdmaShuffleBlockResolver(rdmaShuffleManager: TetrisShuffleManager)
     extends IndexShuffleBlockResolver(rdmaShuffleManager.conf) with Logging {
   private val rdmaShuffleDataMap = new ConcurrentHashMap[Int, RdmaWrapperShuffleData]
 

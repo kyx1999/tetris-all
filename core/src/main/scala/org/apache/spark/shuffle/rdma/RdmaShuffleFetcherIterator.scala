@@ -51,7 +51,7 @@ private[spark] final class RdmaShuffleFetcherIterator(
   private[this] var numBlocksProcessed = 0
 
   private[this] val rdmaShuffleManager =
-    SparkEnv.get.shuffleManager.asInstanceOf[RdmaShuffleManager]
+    SparkEnv.get.shuffleManager.asInstanceOf[TetrisShuffleManager]
 
   private[this] val resultsQueue = new LinkedBlockingQueue[FetchResult]
 

@@ -32,7 +32,7 @@ import org.apache.spark.shuffle.sort._
 class RdmaWrapperShuffleData(
     shuffleId: Int,
     numPartitions: Int,
-    rdmaShuffleManager: RdmaShuffleManager) {
+    rdmaShuffleManager: TetrisShuffleManager) {
   private val rdmaMappedFileByMapId = new ConcurrentHashMap[Int, RdmaMappedFile].asScala
 
   def getInputStreams(partitionId: Int): Seq[InputStream] = {
@@ -108,7 +108,7 @@ class RdmaWrapperShuffleWriter[K, V, C](
     stopping = true
     val optMapStatus = writer.stop(success)
     val startTime = System.nanoTime()
-    val rdmaShuffleManager = env.shuffleManager.asInstanceOf[RdmaShuffleManager]
+    val rdmaShuffleManager = env.shuffleManager.asInstanceOf[TetrisShuffleManager]
     if (success) {
       // Publish this map task's RdmaMapTaskOutput to the Driver
       val dep = handle.dependency

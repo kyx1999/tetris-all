@@ -35,9 +35,9 @@ import org.apache.spark.shuffle.sort.SortShuffleManager
 import org.apache.spark.storage.BlockManagerId
 import org.apache.spark.util.Utils
 
-private[spark] class RdmaShuffleManager(val conf: SparkConf, isDriver: Boolean)
+private[spark] class TetrisShuffleManager(val conf: SparkConf, isDriver: Boolean)
     extends ShuffleManager with Logging {
-  import RdmaShuffleManager._
+  import TetrisShuffleManager._
   val rdmaShuffleConf = new RdmaShuffleConf(conf)
   override val shuffleBlockResolver = new RdmaShuffleBlockResolver(this)
   private var localRdmaShuffleManagerId: Option[RdmaShuffleManagerId] = None
@@ -418,7 +418,7 @@ private[spark] class RdmaShuffleManager(val conf: SparkConf, isDriver: Boolean)
   }
 }
 
-object RdmaShuffleManager{
+object TetrisShuffleManager{
   type ShuffleId = Int
   type MapId = Int
 

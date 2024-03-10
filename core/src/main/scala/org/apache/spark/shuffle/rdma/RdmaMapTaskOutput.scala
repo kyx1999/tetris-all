@@ -38,7 +38,7 @@ class RdmaMapTaskOutput private[rdma](
   private[rdma] def getNumPartitions: Int = lastPartitionId - startPartitionId + 1
   private[rdma] def size: Int = getNumPartitions * ENTRY_SIZE
 
-  final private val bufferManager = SparkEnv.get.shuffleManager.asInstanceOf[RdmaShuffleManager]
+  final private val bufferManager = SparkEnv.get.shuffleManager.asInstanceOf[TetrisShuffleManager]
     .getRdmaBufferManager
   final private val rdmaBuffer = bufferManager.get(size)
   def getRdmaBuffer: RdmaBuffer = rdmaBuffer
