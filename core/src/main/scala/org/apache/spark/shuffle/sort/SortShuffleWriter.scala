@@ -49,10 +49,12 @@ private[spark] class SortShuffleWriter[K, V, C](
 
   /** Write a bunch of records to this task's output */
   override def write(records: Iterator[Product2[K, V]]): Unit = {
-    sorter = if (dep.mapSideCombine) {
+    // kyx1999 writer由manager的getWriter创建 每个task对应一个writer mapId就是partitionId
+    // dep从handle中来 writer创建时被manager传入
+    sorter = if (dep.mapSideCombine) { // 如果dep认为需要上游合并 sorter传入dep的聚合器和key排序顺序
       new ExternalSorter[K, V, C](
         context, dep.aggregator, Some(dep.partitioner), dep.keyOrdering, dep.serializer)
-    } else {
+    } else { // 如果不需要上游合并 就不传 下面insertAll就是把所有数据插入一个合适的数据结构准备排序
       // In this case we pass neither an aggregator nor an ordering to the sorter, because we don't
       // care whether the keys get sorted in each partition; that will be done on the reduce side
       // if the operation being run is sortByKey.
@@ -66,7 +68,12 @@ private[spark] class SortShuffleWriter[K, V, C](
     // (see SPARK-3570).
     val output = shuffleBlockResolver.getDataFile(dep.shuffleId, mapId)
     val tmp = Utils.tempFileWith(output)
-    try {
+    try { // output是根据当前shuffleId和partitionId拿到写入文件名 tmp是给文件名加点随机数前缀后缀啥的
+          // 根据shuffleId partitionId NOOP_REDUCE_ID生成blockId
+          // NOOP_REDUCE_ID是个标识 表明这个文件不是特定给哪个reduce任务的 而是通用的
+          // shuffleId是每次shuffle操作产生一个 每次shuffle操作可能会有多个task
+          // sorter的writePartitionedFile排序并写数据文件
+          // shuffleBlockResolver的writeIndexFileAndCommit写index文件 resolver是manager创建writer时传进来的
       val blockId = ShuffleBlockId(dep.shuffleId, mapId, IndexShuffleBlockResolver.NOOP_REDUCE_ID)
       val partitionLengths = sorter.writePartitionedFile(blockId, tmp)
       shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)

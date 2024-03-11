@@ -1177,7 +1177,7 @@ private[spark] class DAGScheduler(
 
     val tasks: Seq[Task[_]] = try {
       val serializedTaskMetrics = closureSerializer.serialize(stage.latestInfo.taskMetrics).array()
-      stage match {
+      stage match { // kyx1999 每个stage生成多个task 一个stage对应一堆partition 给每个partition生成一个task
         case stage: ShuffleMapStage =>
           stage.pendingPartitions.clear()
           partitionsToCompute.map { id =>

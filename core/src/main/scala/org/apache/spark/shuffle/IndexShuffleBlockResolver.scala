@@ -140,20 +140,21 @@ private[spark] class IndexShuffleBlockResolver(
       dataTmp: File): Unit = {
     val indexFile = getIndexFile(shuffleId, mapId)
     val indexTmp = Utils.tempFileWith(indexFile)
-    try {
+    try { // kyx1999 上面老一套 搞个文件名 下面dataFile是data文件的最终文件名
       val dataFile = getDataFile(shuffleId, mapId)
       // There is only one IndexShuffleBlockResolver per executor, this synchronization make sure
       // the following check and rename are atomic.
-      synchronized {
+      synchronized { // 每个executor上都有一个resolver 确保原子性
         val existingLengths = checkIndexAndDataFile(indexFile, dataFile, lengths.length)
-        if (existingLengths != null) {
+        if (existingLengths != null) { // 如果这个些个分片对应的文件已经被其它executor的resolver写过
+                                       // 直接复制写入结果到lengths给返回status 并删除data的tmp文件
           // Another attempt for the same task has already written our map outputs successfully,
           // so just use the existing partition lengths and delete our temporary map outputs.
           System.arraycopy(existingLengths, 0, lengths, 0, lengths.length)
           if (dataTmp != null && dataTmp.exists()) {
             dataTmp.delete()
           }
-        } else {
+        } else { // 否则 写入index文件
           // This is the first successful attempt in writing the map outputs for this task,
           // so override any existing index and data files with the ones we wrote.
           val out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(indexTmp)))
@@ -169,7 +170,7 @@ private[spark] class IndexShuffleBlockResolver(
             out.close()
           }
 
-          if (indexFile.exists()) {
+          if (indexFile.exists()) { // 把多余文件删除 相关临时文件重命名成最终文件名
             indexFile.delete()
           }
           if (dataFile.exists()) {

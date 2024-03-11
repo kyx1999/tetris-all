@@ -232,7 +232,7 @@ private[spark] class DiskBlockObjectWriter(
   /**
    * Writes a key-value pair.
    */
-  def write(key: Any, value: Any) {
+  def write(key: Any, value: Any) { // kyx1999 就是他！！！万物的终点
     if (!streamOpen) {
       open()
     }
