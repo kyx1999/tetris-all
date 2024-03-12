@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -109,20 +111,23 @@ private[spark] class NettyBlockTransferService(
       tempFileManager: DownloadFileManager): Unit = {
     logTrace(s"Fetch blocks from $host:$port (executor id $execId)")
     try {
-      val blockFetchStarter = new RetryingBlockFetcher.BlockFetchStarter {
+      val blockFetchStarter = new RetryingBlockFetcher.BlockFetchStarter { // kyx1999 创建一个重试对象 覆盖其中的接收数据方法
         override def createAndStart(blockIds: Array[String], listener: BlockFetchingListener) {
           val client = clientFactory.createClient(host, port)
-          new OneForOneBlockFetcher(client, appId, execId, blockIds, listener,
+          new OneForOneBlockFetcher(client, appId, execId, blockIds, listener, // 终点！！！！！！
+            // appId和transportConf根本上都从SparkEnv来 创建这个service对象（shuffleClient）的是spark
+            // appId算是spark应用标识符 这边和对面应当是一样的
+            // client execId blockIds都代表对面
             transportConf, tempFileManager).start()
         }
       }
 
       val maxRetries = transportConf.maxIORetries()
-      if (maxRetries > 0) {
+      if (maxRetries > 0) { // 如果配置了重试次数 用RetryingBlockFetcher来重试获取数据 里面大体上就是多调几次createAndStart
         // Note this Fetcher will correctly handle maxRetries == 0; we avoid it just in case there's
         // a bug in this code. We should remove the if statement once we're sure of the stability.
         new RetryingBlockFetcher(transportConf, blockFetchStarter, blockIds, listener).start()
-      } else {
+      } else { // 如果没配置重试次数 直接createAndStart
         blockFetchStarter.createAndStart(blockIds, listener)
       }
     } catch {

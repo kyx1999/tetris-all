@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -88,6 +90,7 @@ private[spark] class ResultTask[T, U](
     } else 0L
 
     func(context, rdd.iterator(partition, context))
+    // kyx1999 用反序列化得到的func和rdd开始计算 rdd要对其取迭代器 获取迭代器的方法中有对rdd的reduce处理 这里的partition就是要读的partition了
   }
 
   // This is only callable on the driver side.

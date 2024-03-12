@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -110,7 +112,8 @@ public class OneForOneBlockFetcher {
       throw new IllegalArgumentException("Zero-sized blockIds array");
     }
 
-    client.sendRpc(openMessage.toByteBuffer(), new RpcResponseCallback() {
+    client.sendRpc(openMessage.toByteBuffer(), new RpcResponseCallback() { // kyx1999 openMessage由appId execId blockIds组成
+      // 就是发给对面请求数据的信息 后面是回调
       @Override
       public void onSuccess(ByteBuffer response) {
         try {
@@ -120,10 +123,10 @@ public class OneForOneBlockFetcher {
           // Immediately request all chunks -- we expect that the total size of the request is
           // reasonable due to higher level chunking in [[ShuffleBlockFetcherIterator]].
           for (int i = 0; i < streamHandle.numChunks; i++) {
-            if (downloadFileManager != null) {
+            if (downloadFileManager != null) { // 前面判定此处数据太大 用DownloadCallback搞成文件
               client.stream(OneForOneStreamManager.genStreamChunkId(streamHandle.streamId, i),
                 new DownloadCallback(i));
-            } else {
+            } else { // 前面判定此处数据不太大 用chunkCallback存到内存 chunkCallback里是成功则回调listener的回调 就是在ShuffleBlockFetcherIterator中重写回调函数的那个listener
               client.fetchChunk(streamHandle.streamId, i, chunkCallback);
             }
           }
@@ -172,7 +175,7 @@ public class OneForOneBlockFetcher {
     }
 
     @Override
-    public void onComplete(String streamId) throws IOException {
+    public void onComplete(String streamId) throws IOException { // kyx1999 最后这里回调listener中的回调函数
       listener.onBlockFetchSuccess(blockIds[chunkIndex], channel.closeAndRead());
       if (!downloadFileManager.registerTempFileToClean(targetFile)) {
         targetFile.delete();

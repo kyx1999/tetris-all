@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -47,7 +49,11 @@ private[spark] class BlockStoreShuffleReader[K, C](
       blockManager.shuffleClient,
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
+      // kyx1999 这里就相当于获取这个范围（这里就一个）的partition 所要读取的block集合 包括他们所属的blockManagerId blockId block长度
+      // blockManagerId并不是一个数 这里哈包括了其它相关信息 比如它的executorId host port啥的
       serializerManager.wrapStream,
+      // 这里传的serializerManager.wrapStream是一个函数 用blockId来加密和压缩输入流 参数和返回值见ShuffleBlockFetcherIterator
+      // 剩下几个参数看ShuffleBlockFetcherIterator上面的注释 解释得很详细
       // Note: we use getSizeAsMb when no suffix is provided for backwards compatibility
       SparkEnv.get.conf.getSizeAsMb("spark.reducer.maxSizeInFlight", "48m") * 1024 * 1024,
       SparkEnv.get.conf.getInt("spark.reducer.maxReqsInFlight", Int.MaxValue),
@@ -62,9 +68,13 @@ private[spark] class BlockStoreShuffleReader[K, C](
       // Note: the asKeyValueIterator below wraps a key/value iterator inside of a
       // NextIterator. The NextIterator makes sure that close() is called on the
       // underlying InputStream when all records have been read.
+      // 这就相当于用反序列化把Iterator[(BlockId, InputStream)]中的InputStream还原
+      // 成Iterator[(Any, Any)]中的后一个Any 这个Any是个给后面用的键值对结构 这里会对wrappedStreams迭代
+      // 上面那一堆英文注释说的是这块的操作会自动给释放迭代器 不会有资源泄露
       serializerInstance.deserializeStream(wrappedStream).asKeyValueIterator
     }
 
+    // 这里往后都是对任务度量的更新 创建一个什么迭代器响应任务中断 根据是否map端聚合选择这边的聚合器 是否排序 返回结果啥的 数据已经拿到了
     // Update the context task metrics for each record read.
     val readMetrics = context.taskMetrics.createTempShuffleReadMetrics()
     val metricIter = CompletionIterator[(Any, Any), Iterator[(Any, Any)]](

@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -282,9 +284,9 @@ abstract class RDD[T: ClassTag](
    * subclasses of RDD.
    */
   final def iterator(split: Partition, context: TaskContext): Iterator[T] = {
-    if (storageLevel != StorageLevel.NONE) {
+    if (storageLevel != StorageLevel.NONE) { // kyx1999 说明数据被持久化或缓存 从持久化存储或缓存中获取数据或计算
       getOrCompute(split, context)
-    } else {
+    } else { // 说明数据未被持久化或缓存 计算或从检查点中读取数据
       computeOrReadCheckpoint(split, context)
     }
   }
@@ -317,7 +319,7 @@ abstract class RDD[T: ClassTag](
    * Compute an RDD partition or read it from a checkpoint if the RDD is checkpointing.
    */
   private[spark] def computeOrReadCheckpoint(split: Partition, context: TaskContext): Iterator[T] =
-  {
+  { // kyx1999 不管上面持久化或缓存与否 只要需要计算 最终都是到这里来
     if (isCheckpointedAndMaterialized) {
       firstParent[T].iterator(split, context)
     } else {

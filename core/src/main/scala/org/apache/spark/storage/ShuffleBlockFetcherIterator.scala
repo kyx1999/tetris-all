@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -253,7 +255,7 @@ final class ShuffleBlockFetcherIterator(
     // Fetch remote shuffle blocks to disk when the request is too large. Since the shuffle data is
     // already encrypted and compressed over the wire(w.r.t. the related configs), we can just fetch
     // the data and write it to file directly.
-    if (req.size > maxReqSizeShuffleToMem) {
+    if (req.size > maxReqSizeShuffleToMem) { // kyx1999 请求大小大于一定数值 写到磁盘上
       shuffleClient.fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
         blockFetchingListener, this)
     } else {
@@ -266,6 +268,7 @@ final class ShuffleBlockFetcherIterator(
     // Make remote requests at most maxBytesInFlight / 5 in length; the reason to keep them
     // smaller than maxBytesInFlight is to allow multiple, parallel fetches from up to 5
     // nodes, rather than blocking on reading output from one node.
+    // kyx1999 先看上面注释 另外这一片的FetchRequest是个临时类型 就是(BlockManagerId, Seq[(BlockId, Long)])
     val targetRequestSize = math.max(maxBytesInFlight / 5, 1L)
     logDebug("maxBytesInFlight: " + maxBytesInFlight + ", targetRequestSize: " + targetRequestSize
       + ", maxBlocksInFlightPerAddress: " + maxBlocksInFlightPerAddress)
@@ -274,8 +277,9 @@ final class ShuffleBlockFetcherIterator(
     // at most maxBytesInFlight in order to limit the amount of data in flight.
     val remoteRequests = new ArrayBuffer[FetchRequest]
 
-    for ((address, blockInfos) <- blocksByAddress) {
+    for ((address, blockInfos) <- blocksByAddress) { // blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])]
       if (address.executorId == blockManager.blockManagerId.executorId) {
+        // BlockManagerId在本地 检查报错 如无 它所有的blockId加入集合localBlocks 计数增加 kyxTODO numBlocksToFetch这个计数什么鬼
         blockInfos.find(_._2 <= 0) match {
           case Some((blockId, size)) if size < 0 =>
             throw new BlockException(blockId, "Negative block size " + size)
@@ -285,13 +289,13 @@ final class ShuffleBlockFetcherIterator(
         }
         localBlocks ++= blockInfos.map(_._1)
         numBlocksToFetch += localBlocks.size
-      } else {
+      } else { // BlockManagerId不在本地 遍历这个BlockManagerId的所有block
         val iterator = blockInfos.iterator
         var curRequestSize = 0L
         var curBlocks = new ArrayBuffer[(BlockId, Long)]
         while (iterator.hasNext) {
           val (blockId, size) = iterator.next()
-          if (size < 0) {
+          if (size < 0) { // 检查报错 如无则加入curBlocks 集合remoteBlocks记录blockId numBlocksToFetch+1 curRequestSize+size
             throw new BlockException(blockId, "Negative block size " + size)
           } else if (size == 0) {
             throw new BlockException(blockId, "Zero-sized blocks should be excluded.")
@@ -303,6 +307,8 @@ final class ShuffleBlockFetcherIterator(
           }
           if (curRequestSize >= targetRequestSize ||
               curBlocks.size >= maxBlocksInFlightPerAddress) {
+            // 如果这个这几轮累计的请求数据大小大于函数开头设定的targetRequestSize 或者block数量多于maxBlocksInFlightPerAddress
+            // 就包装成一次请求 放入remoteRequests返回数组 并清空两个cur开头的临时数据 开始下一轮累计
             // Add this FetchRequest
             remoteRequests += new FetchRequest(address, curBlocks)
             logDebug(s"Creating fetch request of $curRequestSize at $address "
@@ -327,12 +333,12 @@ final class ShuffleBlockFetcherIterator(
    * `ManagedBuffer`'s memory is allocated lazily when we create the input stream, so all we
    * track in-memory are the ManagedBuffer references themselves.
    */
-  private[this] def fetchLocalBlocks() {
+  private[this] def fetchLocalBlocks() { // kyx1999 把所有本地能拿到的block包装成FetchResult全放入results
     logDebug(s"Start fetching local blocks: ${localBlocks.mkString(", ")}")
     val iter = localBlocks.iterator
     while (iter.hasNext) {
       val blockId = iter.next()
-      try {
+      try { // 这里返回的是BlockManagerManagedBuffer retain引用计数+1 有解释说是为了可能要传给不同的线程 在堆内还是堆外看spark配置
         val buf = blockManager.getBlockData(blockId)
         shuffleMetrics.incLocalBlocksFetched(1)
         shuffleMetrics.incLocalBytesRead(buf.size)
@@ -349,14 +355,14 @@ final class ShuffleBlockFetcherIterator(
     }
   }
 
-  private[this] def initialize(): Unit = {
+  private[this] def initialize(): Unit = { // kyx1999 相当于构造函数 class的中括号里只调用了它
     // Add a task completion callback (called in both success case and failure case) to cleanup.
     context.addTaskCompletionListener[Unit](_ => cleanup())
 
     // Split local and remote blocks.
-    val remoteRequests = splitLocalRemoteBlocks()
+    val remoteRequests = splitLocalRemoteBlocks() // 分离了本地和远端 远端在返回值 本地在localBlocks
     // Add the remote requests into our queue in a random order
-    fetchRequests ++= Utils.randomize(remoteRequests)
+    fetchRequests ++= Utils.randomize(remoteRequests) // 拿到所有待获取的远端block的信息 还要随机打乱顺序
     assert ((0 == reqsInFlight) == (0 == bytesInFlight),
       "expected reqsInFlight = 0 but found reqsInFlight = " + reqsInFlight +
       ", expected bytesInFlight = 0 but found bytesInFlight = " + bytesInFlight)
@@ -364,7 +370,7 @@ final class ShuffleBlockFetcherIterator(
     // Send out initial requests for blocks, up to our maxBytesInFlight
     fetchUpToMaxBytes()
 
-    val numFetches = remoteRequests.size - fetchRequests.size
+    val numFetches = remoteRequests.size - fetchRequests.size // 总共的 - 未完成的（要么完成了要么推迟了 这两种都会弹出fetchRequests） = 已完成的
     logInfo("Started " + numFetches + " remote fetches in" + Utils.getUsedTimeMs(startTime))
 
     // Get Local Blocks
@@ -395,7 +401,7 @@ final class ShuffleBlockFetcherIterator(
     // then fetch it one more time if it's corrupt, throw FailureFetchResult if the second fetch
     // is also corrupt, so the previous stage could be retried.
     // For local shuffle block, throw FailureFetchResult for the first IOException.
-    while (result == null) {
+    while (result == null) { // kyx1999 results是个java中的线程安全的队列 take会阻塞
       val startFetchWait = System.currentTimeMillis()
       result = results.take()
       val stopFetchWait = System.currentTimeMillis()
@@ -450,7 +456,7 @@ final class ShuffleBlockFetcherIterator(
           }
           var isStreamCopied: Boolean = false
           try {
-            input = streamWrapper(blockId, in)
+            input = streamWrapper(blockId, in) // 通过包装让这边认为这是一个压缩或加密的数据流 以便后续进行解压操作
             // Only copy the stream if it's wrapped by compression or encryption, also the size of
             // block is small (the decompressed block is smaller than maxBytesInFlight)
             if (detectCorrupt && !input.eq(in) && size < maxBytesInFlight / 3) {
@@ -498,7 +504,7 @@ final class ShuffleBlockFetcherIterator(
     // immediately, defer the request until the next time it can be processed.
 
     // Process any outstanding deferred fetch requests if possible.
-    if (deferredFetchRequests.nonEmpty) {
+    if (deferredFetchRequests.nonEmpty) { // kyx1999 先看看推迟队列里有没有请求 如果有 先请求它们 中间还有核算各种限制 不能获取就再等下次
       for ((remoteAddress, defReqQueue) <- deferredFetchRequests) {
         while (isRemoteBlockFetchable(defReqQueue) &&
             !isRemoteAddressMaxedOut(remoteAddress, defReqQueue.front)) {
@@ -514,7 +520,7 @@ final class ShuffleBlockFetcherIterator(
     }
 
     // Process any regular fetch requests if possible.
-    while (isRemoteBlockFetchable(fetchRequests)) {
+    while (isRemoteBlockFetchable(fetchRequests)) { // 尝试请求 中间还有核算各种限制 不能获取就放到推迟队列
       val request = fetchRequests.dequeue()
       val remoteAddress = request.address
       if (isRemoteAddressMaxedOut(remoteAddress, request)) {
@@ -527,7 +533,7 @@ final class ShuffleBlockFetcherIterator(
       }
     }
 
-    def send(remoteAddress: BlockManagerId, request: FetchRequest): Unit = {
+    def send(remoteAddress: BlockManagerId, request: FetchRequest): Unit = { // 发送请求！！！
       sendRequest(request)
       numBlocksInFlightPerAddress(remoteAddress) =
         numBlocksInFlightPerAddress.getOrElse(remoteAddress, 0) + request.blocks.size

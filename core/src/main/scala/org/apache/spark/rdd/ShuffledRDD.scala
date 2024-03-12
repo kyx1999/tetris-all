@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -100,6 +102,9 @@ class ShuffledRDD[K: ClassTag, V: ClassTag, C: ClassTag](
   }
 
   override def compute(split: Partition, context: TaskContext): Iterator[(K, C)] = {
+    // kyx1999 真正的计算所在
+    // 就是根据当前这个rdd获取到的dep中的handle 分区头 分区尾 context 创建并获取reader read并返回结果的迭代器
+    // 分区头分区尾是从split拿到的 split就是上层task的partition 分区尾就是分区头+1 表示只读取一个分区 context也是task给的
     val dep = dependencies.head.asInstanceOf[ShuffleDependency[K, V, C]]
     SparkEnv.get.shuffleManager.getReader(dep.shuffleHandle, split.index, split.index + 1, context)
       .read()
