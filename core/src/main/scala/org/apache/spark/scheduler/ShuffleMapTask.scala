@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -93,13 +95,11 @@ private[spark] class ShuffleMapTask(
     } else 0L
 
     var writer: ShuffleWriter[Any, Any] = null
-    try { // kyx1999 根据从task创建时传入的taskBinary反序列化得到的handle类型获取对应类型的writer
-          // writer类型三选一 判断依据是上下游task数量和一些其它条件 详细见教程
-          // partitionId是task父类里传入的 partitionId在getWriter中叫mapId
-          // 最后再拿着反序列化得到的rdd 开始写
+    try {
       val manager = SparkEnv.get.shuffleManager
-      writer = manager.getWriter[Any, Any](dep.shuffleHandle, partitionId, context)
-      writer.write(rdd.iterator(partition, context).asInstanceOf[Iterator[_ <: Product2[Any, Any]]])
+      writer = manager.getWriter[Any, Any](dep.shuffleHandle, partitionId, context) // kyx1999 根据从task创建时传入的taskBinary反序列化得到的handle类型获取对应类型的writer
+      // writer类型三选一 判断依据是上下游task数量和一些其它条件 详细见教程 partitionId是task父类里传入的 partitionId在getWriter中叫mapId
+      writer.write(rdd.iterator(partition, context).asInstanceOf[Iterator[_ <: Product2[Any, Any]]]) // 最后再拿着反序列化得到的rdd 开始写
       writer.stop(success = true).get
     } catch {
       case e: Exception =>

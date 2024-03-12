@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -232,7 +234,7 @@ private[spark] class DiskBlockObjectWriter(
   /**
    * Writes a key-value pair.
    */
-  def write(key: Any, value: Any) { // kyx1999 就是他！！！万物的终点
+  def write(key: Any, value: Any) { // kyx1999 就是它！！！万物的终点 好像只用了这个 另外俩write没用到
     if (!streamOpen) {
       open()
     }

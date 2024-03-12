@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -54,30 +56,29 @@ private[spark] class SortShuffleWriter[K, V, C](
     sorter = if (dep.mapSideCombine) { // 如果dep认为需要上游合并 sorter传入dep的聚合器和key排序顺序
       new ExternalSorter[K, V, C](
         context, dep.aggregator, Some(dep.partitioner), dep.keyOrdering, dep.serializer)
-    } else { // 如果不需要上游合并 就不传 下面insertAll就是把所有数据插入一个合适的数据结构准备排序
+    } else { // 如果不需要上游合并 就不传
       // In this case we pass neither an aggregator nor an ordering to the sorter, because we don't
       // care whether the keys get sorted in each partition; that will be done on the reduce side
       // if the operation being run is sortByKey.
       new ExternalSorter[K, V, V](
         context, aggregator = None, Some(dep.partitioner), ordering = None, dep.serializer)
     }
-    sorter.insertAll(records)
+    sorter.insertAll(records) // 就是把所有数据插入一个合适的数据结构准备排序
 
     // Don't bother including the time to open the merged output file in the shuffle write time,
     // because it just opens a single file, so is typically too fast to measure accurately
     // (see SPARK-3570).
-    val output = shuffleBlockResolver.getDataFile(dep.shuffleId, mapId)
-    val tmp = Utils.tempFileWith(output)
-    try { // output是根据当前shuffleId和partitionId拿到写入文件名 tmp是给文件名加点随机数前缀后缀啥的
-          // 根据shuffleId partitionId NOOP_REDUCE_ID生成blockId
-          // NOOP_REDUCE_ID是个标识 表明这个文件不是特定给哪个reduce任务的 而是通用的
-          // shuffleId是每次shuffle操作产生一个 每次shuffle操作可能会有多个task
-          // sorter的writePartitionedFile排序并写数据文件
-          // shuffleBlockResolver的writeIndexFileAndCommit写index文件 resolver是manager创建writer时传进来的
-      val blockId = ShuffleBlockId(dep.shuffleId, mapId, IndexShuffleBlockResolver.NOOP_REDUCE_ID)
-      val partitionLengths = sorter.writePartitionedFile(blockId, tmp)
-      shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)
+    val output = shuffleBlockResolver.getDataFile(dep.shuffleId, mapId) // 根据当前shuffleId和partitionId拿到写入文件名
+    val tmp = Utils.tempFileWith(output) // 给文件名加点随机数后缀啥的 后面确定了会改回来
+    try {
+      val blockId = ShuffleBlockId(dep.shuffleId, mapId, IndexShuffleBlockResolver.NOOP_REDUCE_ID) // 根据shuffleId partitionId NOOP_REDUCE_ID生成blockId
+      // shuffleId是每次shuffle操作产生一个 每次shuffle操作可能会有多个task NOOP_REDUCE_ID是个标识 表明这个文件不是特定给哪个reduce任务的 而是通用的 为0
+      val partitionLengths = sorter.writePartitionedFile(blockId, tmp) // sorter的writePartitionedFile排序并写数据文件
+      shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp) // shuffleBlockResolver的writeIndexFileAndCommit写index文件 resolver是manager创建writer时传进来的
       mapStatus = MapStatus(blockManager.shuffleServerId, partitionLengths)
+      // 这里的shuffleServerId的类型是BlockManagerId 是一个包含各种当前节点位置信息的对象 返回的status会被广播
+      // 广播后集群中的节点就能够通过spark的api提交它的reduce任务所需的partition以得到对应的block信息
+      // 包括这些block的blockId 长度 所在shuffleServerId 在read端叫BlockManagerId 然后read端根据这个请求block
     } finally {
       if (tmp.exists() && !tmp.delete()) {
         logError(s"Error while deleting temp file ${tmp.getAbsolutePath}")

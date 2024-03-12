@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -138,16 +140,15 @@ private[spark] class IndexShuffleBlockResolver(
       mapId: Int,
       lengths: Array[Long],
       dataTmp: File): Unit = {
-    val indexFile = getIndexFile(shuffleId, mapId)
+    val indexFile = getIndexFile(shuffleId, mapId) // kyx1999 老一套 搞个文件名
     val indexTmp = Utils.tempFileWith(indexFile)
-    try { // kyx1999 上面老一套 搞个文件名 下面dataFile是data文件的最终文件名
-      val dataFile = getDataFile(shuffleId, mapId)
+    try {
+      val dataFile = getDataFile(shuffleId, mapId) // dataFile是data文件的最终文件名
       // There is only one IndexShuffleBlockResolver per executor, this synchronization make sure
       // the following check and rename are atomic.
-      synchronized { // 每个executor上都有一个resolver 确保原子性
+      synchronized { // 每个executor上都有一个resolver 可能由于任务调度已经写过了 确保原子性
         val existingLengths = checkIndexAndDataFile(indexFile, dataFile, lengths.length)
-        if (existingLengths != null) { // 如果这个些个分片对应的文件已经被其它executor的resolver写过
-                                       // 直接复制写入结果到lengths给返回status 并删除data的tmp文件
+        if (existingLengths != null) { // 如果这个些个分片对应的文件已经被其它executor的resolver写过 直接复制写入结果到lengths给返回status 并删除data的tmp文件
           // Another attempt for the same task has already written our map outputs successfully,
           // so just use the existing partition lengths and delete our temporary map outputs.
           System.arraycopy(existingLengths, 0, lengths, 0, lengths.length)

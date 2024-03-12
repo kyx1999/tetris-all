@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -1177,7 +1179,7 @@ private[spark] class DAGScheduler(
 
     val tasks: Seq[Task[_]] = try {
       val serializedTaskMetrics = closureSerializer.serialize(stage.latestInfo.taskMetrics).array()
-      stage match { // kyx1999 每个stage生成多个task 一个stage对应一堆partition 给每个partition生成一个task
+      stage match { // kyx1999 每个stage生成多个task 一个stage对应一堆partition 给每个partition生成一个task 后面开始runTask
         case stage: ShuffleMapStage =>
           stage.pendingPartitions.clear()
           partitionsToCompute.map { id =>

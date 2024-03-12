@@ -1,3 +1,5 @@
+//scalastyle:off
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -176,13 +178,11 @@ private[spark] class ExternalSorter[K, V, C](
    */
   private[spark] def numSpills: Int = spills.size
 
-  def insertAll(records: Iterator[Product2[K, V]]): Unit = {
+  def insertAll(records: Iterator[Product2[K, V]]): Unit = { // kyx1999 这个函数主要是把数据插入进去 还有如果数据过多则溢写到磁盘（maybeSpillCollection） 后续注意对溢写数据的处理
     // TODO: stop combining if we find that the reduction factor isn't high
-    // kyx1999 如果需要聚合 用map 否则直接用buffer
-    // 这个函数主要是把数据插入进去 还有如果数据过多则溢写到磁盘（maybeSpillCollection） 后续注意对溢写数据的处理
     val shouldCombine = aggregator.isDefined
 
-    if (shouldCombine) {
+    if (shouldCombine) { // 如果需要聚合 用map 否则直接用buffer
       // Combine values in-memory first using our AppendOnlyMap
       val mergeValue = aggregator.get.mergeValue
       val createCombiner = aggregator.get.createCombiner
@@ -687,16 +687,14 @@ private[spark] class ExternalSorter[K, V, C](
       outputFile: File): Array[Long] = {
 
     // Track location of each range in the output file
-    // kyx1999 numPartitions的值在sorter被writer创建时由dep导入 代表下游分区的数量 无则1
-    // fileBufferSize默认值32k shuffleWriteMetrics是度量信息不用管
-    val lengths = new Array[Long](numPartitions)
+    val lengths = new Array[Long](numPartitions) // kyx1999 numPartitions的值在sorter被writer创建时由dep导入 代表下游分区的数量 无则1
     val writer = blockManager.getDiskWriter(blockId, outputFile, serInstance, fileBufferSize,
-      context.taskMetrics().shuffleWriteMetrics)
+      context.taskMetrics().shuffleWriteMetrics) // fileBufferSize默认值32k shuffleWriteMetrics是度量信息不用管
 
-    if (spills.isEmpty) { // 如果前面聚合的时候没有发生溢写到磁盘 只在内存中操作就行 comparator是根据创建sorter时传入的ordering得到的
+    if (spills.isEmpty) { // 如果前面聚合的时候没有发生溢写到磁盘 只在内存中操作就行
       // Case where we only have in-memory data
       val collection = if (aggregator.isDefined) map else buffer
-      val it = collection.destructiveSortedWritablePartitionedIterator(comparator)
+      val it = collection.destructiveSortedWritablePartitionedIterator(comparator) // comparator是根据创建sorter时传入的ordering得到的
       while (it.hasNext) { // 经由上面那个迭代器后 获取到的迭代对象就是按照comparator（partitionId）排好序的了 分片写入即可 返回分片长度
         val partitionId = it.nextPartition()
         while (it.hasNext && it.nextPartition() == partitionId) {
