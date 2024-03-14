@@ -50,6 +50,7 @@ private[spark] class BlockStoreShuffleReader[K, C](
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       // kyx1999 这里就相当于获取这个范围（这里就一个）的partition 所要读取的block集合 包括他们所属的blockManagerId blockId block长度
+      // 这里的block长度并不是真实长度 只是用来方便内存管理和凑满一批包装成请求的 小的一般142左右 真实长度从index文件中前后两个offset计算得来
       // blockManagerId并不是一个数 这里哈包括了其它相关信息 比如它的executorId host port啥的
       serializerManager.wrapStream,
       // 这里传的serializerManager.wrapStream是一个函数 用blockId来加密和压缩输入流 参数和返回值见ShuffleBlockFetcherIterator
